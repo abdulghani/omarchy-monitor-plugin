@@ -37,7 +37,7 @@ still gets noticed while you are watching CPU.
 ## Install
 
 ```bash
-omarchy plugin add https://github.com/<you>/monitor-plugin.git --enable --yes
+omarchy plugin add https://github.com/abdulghani/omarchy-monitor-plugin.git --enable --yes
 omarchy restart shell
 ```
 
