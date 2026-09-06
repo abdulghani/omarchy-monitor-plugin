@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "id": "abdulghani.sysmon",
+  "name": "System monitor",
+  "version": "1.0.0",
+  "author": "abdulghani",
+  "description": "CPU, RAM, and storage usage with a breakdown popup",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "System monitor",
+    "description": "CPU, RAM, and storage usage with a breakdown popup",
+    "category": "System",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "barMetric": "cpu"
+    },
+    "schema": [
+      {
+        "key": "barMetric",
+        "type": "string",
+        "label": "Metric shown in the bar",
+        "options": [
+          "cpu",
+          "memory",
+          "storage"
+        ]
+      }
+    ]
+  }
+}
