@@ -24,6 +24,8 @@ Panel {
   property real swapTotalKb: 0
   property real swapFreeKb: 0
   property var disks: []
+  property var fans: []
+  property string fanLevel: ""
   // A first sample only establishes the CPU baseline; percentages are blank
   // until a second one lands to diff against.
   property bool primed: false
@@ -97,6 +99,8 @@ Panel {
     root.swapTotalKb = s.mem["SwapTotal"] || 0
     root.swapFreeKb = s.mem["SwapFree"] || 0
     root.disks = s.disks
+    root.fans = s.fans
+    root.fanLevel = s.fanLevel
 
     // Take the second sample straight away so the widget shows a real CPU
     // figure a moment after login instead of holding 0% for a whole interval.
@@ -462,6 +466,65 @@ Panel {
               value: Model.pairGib(modelData.used, modelData.size)
               fraction: modelData.size > 0 ? modelData.used / modelData.size : 0
             }
+          }
+        }
+
+        PanelSeparator { foreground: root.fg; visible: root.fans.length > 0 }
+
+        // ---------- Fans ----------
+        PanelSectionHeader {
+          text: "FANS"
+          foreground: root.fg
+          visible: root.fans.length > 0
+        }
+
+        Column {
+          width: parent.width
+          spacing: Style.space(5)
+          visible: root.fans.length > 0
+
+          Repeater {
+            model: root.fans
+
+            Item {
+              required property var modelData
+              required property int index
+              width: parent.width
+              implicitHeight: Math.max(fanName.implicitHeight, fanValue.implicitHeight)
+
+              Text {
+                id: fanName
+                textFormat: Text.PlainText
+                text: Model.fanLabel(modelData.label, index, root.fans.length)
+                color: Qt.darker(root.fg, 1.35)
+                font.family: Style.font.family
+                font.pixelSize: Style.font.bodySmall
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+              }
+
+              Text {
+                id: fanValue
+                textFormat: Text.PlainText
+                text: Model.fanSpeed(modelData.rpm)
+                color: root.fg
+                font.family: Style.font.family
+                font.pixelSize: Style.font.bodySmall
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+              }
+            }
+          }
+
+          Text {
+            visible: root.fanLevel !== ""
+            width: parent.width
+            textFormat: Text.PlainText
+            text: "Control   " + Model.fanLevelLabel(root.fanLevel)
+            color: Qt.darker(root.fg, 1.8)
+            font.family: Style.font.family
+            font.pixelSize: Style.font.caption
+            horizontalAlignment: Text.AlignRight
           }
         }
 

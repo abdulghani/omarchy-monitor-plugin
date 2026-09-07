@@ -24,6 +24,10 @@ popup:   SHOW IN BAR
          STORAGE
          /      8%                 37 / 475 GiB
          boot   7%                0.1 / 2.0 GiB
+         ─────────────────────────────────
+         FANS
+         Fan                        Stopped
+                        Control   Automatic
 ```
 
 - **Left-click** the bar — open the popup
@@ -74,6 +78,12 @@ Set from the popup, or from the CLI:
 omarchy bar set abdulghani.sysmon barMetric memory
 ```
 
+**Fans** — RPM per fan, plus the control level where the vendor exposes one
+(ThinkPads report `auto`, `full-speed`, or a numeric level via
+`/proc/acpi/ibm/fan`). A fan reading zero is shown as **Stopped** rather than
+`0 rpm`, since most laptops idle with the fan off. The section hides entirely
+on machines with no fan sensor.
+
 ## Requirements
 
 Bash, `awk`, `df`, and `nproc` — all present on a stock Omarchy install. The
@@ -90,6 +100,11 @@ ticks.
 Polling runs at 5s while only the bar label depends on it, and 1.5s while the
 popup is open. A second sample 600ms after startup means CPU shows a real
 figure right after login instead of holding `—` for a full interval.
+
+hwmon indices are assigned in probe order and move between boots, so the fan
+chip is found by name rather than a fixed `hwmonN` path. `acpi_fan` and a
+vendor chip often report the same physical fan; the vendor chip wins, since
+`acpi_fan` is frequently a stub reading zero.
 
 Btrfs subvolumes and bind mounts report the same source device, so the sampler
 keeps the first mountpoint seen per source. Otherwise one disk lists several

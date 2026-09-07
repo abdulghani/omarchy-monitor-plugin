@@ -8,7 +8,9 @@ function parse(text) {
     mem: {},            // MemTotal / MemAvailable / SwapTotal / SwapFree, in kB
     load: [0, 0, 0],
     cores: 0,
-    disks: []           // { mount, used, size }
+    disks: [],          // { mount, used, size }
+    fans: [],           // { label, rpm }
+    fanLevel: ""
   }
 
   var lines = String(text || "").split("\n")
@@ -31,6 +33,12 @@ function parse(text) {
       break
     case "disk":
       if (f.length >= 4) out.disks.push({ mount: f[1], used: Number(f[2]), size: Number(f[3]) })
+      break
+    case "fan":
+      if (f.length >= 3) out.fans.push({ label: f[1].replace(/-/g, " "), rpm: Number(f[2]) || 0 })
+      break
+    case "fanlevel":
+      out.fanLevel = f[1]
       break
     }
   }
@@ -92,4 +100,24 @@ function percent(part, whole) {
 function mountLabel(mount) {
   if (mount === "/") return "/"
   return mount.replace(/^\//, "")
+}
+
+// "fan1" is what the chip calls it; "Fan" reads better when there is only one.
+function fanLabel(label, index, total) {
+  if (total === 1) return "Fan"
+  if (/^fan[0-9]+$/i.test(label)) return "Fan " + (index + 1)
+  return label
+}
+
+// A fan reporting zero is stopped, not broken — most laptops idle with the fan
+// off, so say so rather than showing a bare "0 rpm".
+function fanSpeed(rpm) {
+  return rpm > 0 ? rpm + " rpm" : "Stopped"
+}
+
+function fanLevelLabel(level) {
+  if (!level) return ""
+  if (level === "auto") return "Automatic"
+  if (level === "full-speed" || level === "disengaged") return "Full speed"
+  return "Level " + level
 }
