@@ -5,13 +5,15 @@ import qs.Ui
 import "Model.js" as Model
 
 // Bar readout of CPU / RAM / storage load, with a popup breaking each one
-// down. Sampling is a single short-lived script per poll rather than a
-// resident reader, so the widget costs nothing between ticks.
+// down and a switch that caps CPU speed. Sampling is a single short-lived
+// script per poll rather than a resident reader, so the widget costs nothing
+// between ticks.
 Panel {
   id: root
   moduleName: "abdulghani.sysmon"
 
   readonly property string scriptPath: Qt.resolvedUrl("sample.sh").toString().replace(/^file:\/\//, "")
+  readonly property string throttleScript: Qt.resolvedUrl("throttle.sh").toString().replace(/^file:\/\//, "")
   readonly property color fg: bar ? bar.foreground : Color.foreground
 
   // Raw counters from the previous poll, kept so the next one can be diffed.
@@ -26,6 +28,18 @@ Panel {
   property var disks: []
   property var fans: []
   property string fanLevel: ""
+
+  // CPU throttle: whether the kernel exposes per-core speed caps, whether the
+  // tmpfiles rule has made them writable, and the speed "on" caps cores at (kHz).
+  property bool cpufreqAvailable: false
+  property bool cpufreqWritable: false
+  property real cpuCap: 0
+  property bool throttled: false
+  // Held while the switch is in flight, so it moves on the click rather than
+  // on the next poll: -1 none, 0 off, 1 on.
+  property int pendingThrottle: -1
+  readonly property bool shownThrottle: pendingThrottle >= 0 ? pendingThrottle === 1 : throttled
+
   // A first sample only establishes the CPU baseline; percentages are blank
   // until a second one lands to diff against.
   property bool primed: false
@@ -101,6 +115,10 @@ Panel {
     root.disks = s.disks
     root.fans = s.fans
     root.fanLevel = s.fanLevel
+    root.cpufreqAvailable = s.cpufreq
+    root.cpufreqWritable = s.cpufreqWritable
+    root.cpuCap = s.cpuCap
+    root.throttled = s.throttle
 
     // Take the second sample straight away so the widget shows a real CPU
     // figure a moment after login instead of holding 0% for a whole interval.
@@ -108,6 +126,15 @@ Panel {
       root.primed = true
       primeTimer.restart()
     }
+  }
+
+  // throttle.sh writes the cap to every core and remembers the switch, so the
+  // cap can be put back after a reboot.
+  function setThrottle(on) {
+    if (!root.cpufreqWritable || throttleProc.running) return
+    root.pendingThrottle = on ? 1 : 0
+    throttleProc.command = [root.throttleScript, on ? "on" : "off"]
+    throttleProc.running = true
   }
 
   implicitWidth: button.implicitWidth
@@ -120,6 +147,24 @@ Panel {
       waitForEnd: true
       onStreamFinished: root.applySample(text)
     }
+  }
+
+  Process {
+    id: throttleProc
+    onExited: {
+      root.pendingThrottle = -1
+      root.sample()
+    }
+  }
+
+  // The kernel forgets a speed cap at reboot, so put the switch's remembered
+  // position back once, when the widget starts. It only ever applies a cap;
+  // with the switch left off it touches nothing.
+  Process {
+    id: restoreProc
+    command: [root.throttleScript, "restore"]
+    running: true
+    onExited: root.sample()
   }
 
   Timer {
@@ -418,6 +463,59 @@ Panel {
               fraction: root.cpuUsage[modelData] || 0
               fill: root.meterColor(fraction)
             }
+          }
+        }
+
+        // CPU speed cap. Label on the left and a compact switch on the trailing
+        // edge, the way Omarchy's own Bluetooth panel lays out its power switch.
+        Column {
+          width: parent.width
+          spacing: Style.space(4)
+          visible: root.cpufreqAvailable
+
+          Item {
+            width: parent.width
+            implicitHeight: Math.max(throttleLabel.implicitHeight, throttleSwitch.implicitHeight)
+
+            Text {
+              id: throttleLabel
+              textFormat: Text.PlainText
+              text: "Throttle CPU"
+              color: root.fg
+              font.family: Style.font.family
+              font.pixelSize: Style.font.body
+              elide: Text.ElideRight
+              anchors.left: parent.left
+              anchors.right: throttleSwitch.left
+              anchors.rightMargin: Style.space(8)
+              anchors.verticalCenter: parent.verticalCenter
+            }
+
+            ToggleSwitch {
+              id: throttleSwitch
+              checked: root.shownThrottle
+              busy: throttleProc.running
+              interactive: root.cpufreqWritable
+              opacity: root.cpufreqWritable ? 1.0 : 0.5
+              foreground: root.fg
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              onToggled: root.setThrottle(!root.shownThrottle)
+            }
+          }
+
+          // Without the tmpfiles rule the caps are root-only, so the switch
+          // can show the state but not change it.
+          Text {
+            width: parent.width
+            wrapMode: Text.WordWrap
+            textFormat: Text.PlainText
+            text: root.cpufreqWritable
+              ? Model.throttleDescription(root.shownThrottle, root.cpuCap)
+              : "Throttle is read-only. Install the tmpfiles rule shipped with this plugin."
+            color: root.cpufreqWritable ? Qt.darker(root.fg, 1.8) : Color.urgent
+            font.family: Style.font.family
+            font.pixelSize: Style.font.caption
           }
         }
 

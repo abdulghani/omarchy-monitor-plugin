@@ -10,6 +10,7 @@
 #   disk  <mountpoint> <used-bytes> <size-bytes>
 #   fan   <label> <rpm>                 (one per fan on the chosen chip)
 #   fanlevel <level>                    (ThinkPad fan control level, if exposed)
+#   cpufreq, cpufreqwritable, cpucap, throttle, throttlesaved   (see throttle.sh)
 
 set -uo pipefail
 export LC_ALL=C
@@ -68,3 +69,7 @@ if [ -r /proc/acpi/ibm/fan ]; then
   level=$(awk -F':' '/^level:/ { gsub(/[ \t]/, "", $2); print $2 }' /proc/acpi/ibm/fan 2>/dev/null)
   [ -n "$level" ] && printf 'fanlevel %s\n' "$level"
 fi
+
+# ---- CPU throttle ----------------------------------------------------------
+# throttle.sh owns what the cap is, so the reading comes from there too.
+"${0%/*}/throttle.sh" status

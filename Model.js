@@ -10,7 +10,11 @@ function parse(text) {
     cores: 0,
     disks: [],          // { mount, used, size }
     fans: [],           // { label, rpm }
-    fanLevel: ""
+    fanLevel: "",
+    cpufreq: false,     // per-core speed caps exposed by the kernel
+    cpufreqWritable: false,
+    cpuCap: 0,          // kHz the throttle caps every core at
+    throttle: false
   }
 
   var lines = String(text || "").split("\n")
@@ -39,6 +43,18 @@ function parse(text) {
       break
     case "fanlevel":
       out.fanLevel = f[1]
+      break
+    case "cpufreq":
+      out.cpufreq = f[1] === "yes"
+      break
+    case "cpufreqwritable":
+      out.cpufreqWritable = f[1] === "yes"
+      break
+    case "cpucap":
+      out.cpuCap = Number(f[1]) || 0
+      break
+    case "throttle":
+      out.throttle = f[1] === "on"
       break
     }
   }
@@ -120,4 +136,16 @@ function fanLevelLabel(level) {
   if (level === "auto") return "Automatic"
   if (level === "full-speed" || level === "disengaged") return "Full speed"
   return "Level " + level
+}
+
+// Gigahertz, from the kernel's kilohertz, to one decimal.
+function ghz(khz) {
+  return ((Number(khz) || 0) / 1000000).toFixed(1) + " GHz"
+}
+
+// What the throttle switch does, in one line, so the panel explains it in place.
+function throttleDescription(on, capKhz) {
+  if (on)
+    return "Every core is capped at " + ghz(capKhz) + ". Saves power under sustained load; heavy work takes longer."
+  return "Caps every core at " + ghz(capKhz) + " to save power under sustained load. Remembered across reboots."
 }
